@@ -16,16 +16,30 @@
     #reader { overflow: hidden; border-radius: 16px; background: #10291a; }
     #message { color: #66736b; font-size: 13px; line-height: 1.5; }
     button { width: 100%; padding: 13px; border: 0; border-radius: 14px; color: white; background: #375543; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .back-button { margin-bottom: 14px; padding: 10px 12px; border: 1px solid #dce7dd; color: #375543; background: #f4f7f3; font-size: 12px; }
     button:disabled { opacity: .55; cursor: default; }
   </style>
 </head>
 <body>
   <main>
     <header>
-      <p>Tindak Lanjut RO</p>
-      <h1>Scan QR Dokumen Final</h1>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:14px">
+        <div>
+          <p>PERBAIKAN BANGUNAN</p>
+          <h1>Scan QR Dokumen Final</h1>
+        </div>
+        <div aria-hidden="true" style="display:flex;width:54px;height:54px;flex:none;align-items:center;justify-content:center;border-radius:18px;background:#e3eed4;color:#375543">
+          <svg viewBox="0 0 48 48" width="34" height="34" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 40V14.5L24 7l15 7.5V40H9Z" stroke="currentColor" stroke-width="2.7" stroke-linejoin="round"/>
+            <path d="M17 19h4m6 0h4M17 26h4m6 0h4M21 40V32h6v8" stroke="currentColor" stroke-width="2.7" stroke-linecap="round"/>
+            <path d="m31 9 2-2a5 5 0 0 1 6 6l-2 2-4-1-2-5Z" fill="#8caf78" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+            <path d="m32 14-8 8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
     </header>
     <section>
+      <button id="back" class="back-button" type="button"><span aria-hidden="true">←</span> Kembali ke Update</button>
       <div id="reader"></div>
       <p id="message">Tekan tombol untuk mengaktifkan kamera. Izinkan akses kamera saat diminta.</p>
       <button id="start" type="button">Aktifkan kamera</button>
@@ -34,8 +48,42 @@
   <script>
     let scanner = null;
     const button = document.getElementById("start");
+    const backButton = document.getElementById("back");
     const message = document.getElementById("message");
     const returnOrigin = new URLSearchParams(window.location.search).get("returnOrigin") || "";
+
+    function kembaliKeUpdate_() {
+      backButton.disabled = true;
+      message.textContent = "Menutup pemindai...";
+      const kembali = function() {
+        if (window.opener && !window.opener.closed) {
+          window.opener.focus();
+          window.close();
+          window.setTimeout(function() {
+            if (!window.closed) {
+              message.textContent = "Pemindai sudah berhenti. Kembali ke tab aplikasi SCSB.";
+              backButton.disabled = false;
+            }
+          }, 300);
+        } else {
+          window.history.back();
+        }
+      };
+      if (scanner) {
+        scanner.stop().then(function() {
+          scanner.clear();
+          scanner = null;
+          kembali();
+        }).catch(function() {
+          scanner = null;
+          kembali();
+        });
+      } else {
+        kembali();
+      }
+    }
+
+    backButton.addEventListener("click", kembaliKeUpdate_);
 
     button.addEventListener("click", function() {
       if (!window.opener || !returnOrigin) {
