@@ -4,7 +4,6 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Scan QR Dokumen Final · SCSB</title>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"></script>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; background: #f5f7f5; color: #24332b; font-family: Arial, sans-serif; }
@@ -27,18 +26,66 @@
     </header>
     <section>
       <div id="reader"></div>
-      <p id="message">Tekan tombol untuk mengaktifkan kamera. Izinkan akses kamera saat diminta.</p>
-      <button id="start" type="button">Aktifkan kamera</button>
+      <p id="message">Memuat pustaka pemindai...</p>
+      <button id="start" type="button" disabled>Aktifkan kamera</button>
     </section>
   </main>
   <script>
     let scanner = null;
     const button = document.getElementById("start");
     const message = document.getElementById("message");
+    const returnOrigin = new URLSearchParams(window.location.search).get("returnOrigin") || "";
+    const qrLibrarySources = [
+      "https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/minified/html5-qrcode.min.js",
+      "https://unpkg.com/html5-qrcode@2.3.8/minified/html5-qrcode.min.js"
+    ];
+    let loadingQrLibrary = false;
+
+    function muatLibraryQr_(index) {
+      if (typeof Html5Qrcode !== "undefined") {
+        loadingQrLibrary = false;
+        button.disabled = false;
+        message.textContent = "Tekan tombol untuk mengaktifkan kamera. Izinkan akses kamera saat diminta.";
+        return;
+      }
+      if (loadingQrLibrary) return;
+      if (index >= qrLibrarySources.length) {
+        button.disabled = false;
+        message.textContent = "Pustaka pemindai tidak dapat dimuat dari CDN. Periksa koneksi atau pemblokir konten, lalu tekan tombol untuk mencoba lagi.";
+        return;
+      }
+
+      loadingQrLibrary = true;
+      button.disabled = true;
+      message.textContent = "Memuat pustaka pemindai...";
+      const script = document.createElement("script");
+      script.src = qrLibrarySources[index];
+      script.async = true;
+      script.onload = function() {
+        loadingQrLibrary = false;
+        if (typeof Html5Qrcode !== "undefined") {
+          button.disabled = false;
+          message.textContent = "Tekan tombol untuk mengaktifkan kamera. Izinkan akses kamera saat diminta.";
+          return;
+        }
+        script.remove();
+        muatLibraryQr_(index + 1);
+      };
+      script.onerror = function() {
+        loadingQrLibrary = false;
+        script.remove();
+        muatLibraryQr_(index + 1);
+      };
+      document.head.appendChild(script);
+    }
 
     button.addEventListener("click", function() {
+      if (!window.opener || !returnOrigin) {
+        message.textContent = "Buka halaman pemindai dari tombol Scan QR di aplikasi SCSB.";
+        return;
+      }
       if (typeof Html5Qrcode === "undefined") {
-        message.textContent = "Pemindai gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.";
+        muatLibraryQr_(0);
         return;
       }
       button.disabled = true;
@@ -59,7 +106,19 @@
               button.disabled = false;
               return;
             }
-            window.opener.postMessage({type: "SCSB_QR_SCAN", decodedText: decodedText}, "*");
+            let targetOrigin = "";
+            try {
+              const parsedOrigin = new URL(returnOrigin);
+              if (parsedOrigin.protocol === "https:" && parsedOrigin.origin === returnOrigin) {
+                targetOrigin = parsedOrigin.origin;
+              }
+            } catch (error) {}
+            if (!targetOrigin) {
+              message.textContent = "Asal aplikasi tidak valid. Buka pemindai dari tombol Scan QR di aplikasi SCSB.";
+              button.disabled = false;
+              return;
+            }
+            window.opener.postMessage({type: "SCSB_QR_SCAN", decodedText: decodedText}, targetOrigin);
             window.close();
           }).catch(function(error) {
             message.textContent = "Kamera tidak dapat dihentikan dengan benar: " + String(error || "");
@@ -75,6 +134,8 @@
         message.textContent = "Kamera tidak dapat dibuka. Izinkan akses kamera pada browser dan pastikan halaman menggunakan HTTPS. " + String(error || "");
       });
     });
+
+    muatLibraryQr_(0);
   </script>
 </body>
 </html>
